@@ -12,7 +12,6 @@
 #include <ctime>
 
 #include "config.h"
-#include "ota_update.h"
 
 namespace {
 
@@ -169,8 +168,6 @@ bool begin(const LightSettings &initialSettings) {
     Serial.println("Zigbee: router start failed");
     return false;
   }
-
-  ota_update::begin();
 
   if (!endpoint->setLight(initialSettings.on, initialSettings.level,
                           initialSettings.red, initialSettings.green,

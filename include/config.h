@@ -30,15 +30,15 @@ constexpr uint32_t kSettingsSaveDelayMs = 500;
 
 constexpr const char *kSettingsNamespace = "doorbell";
 
-constexpr uint32_t kFirmwareVersion = 0x00010001;
+constexpr uint32_t kFirmwareVersion = 0x00010002;
 constexpr uint16_t kOtaManufacturer = 0x1A1A;
 constexpr uint16_t kOtaImageType = 0x0001;
 constexpr uint16_t kOtaHardwareVersion = 0x0001;
 constexpr uint8_t kOtaMaxDataSize = 223;
 
-constexpr int8_t kI2sBclkPin = 18;
-constexpr int8_t kI2sLrcPin = 19;
-constexpr int8_t kI2sDinPin = 20;
+constexpr int8_t kI2sBclkPin = 1;
+constexpr int8_t kI2sLrcPin = 2;
+constexpr int8_t kI2sDinPin = 0;
 
 constexpr const char *kDoorbellPath = "/doorbell.wav";
 
