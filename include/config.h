@@ -30,7 +30,7 @@ constexpr uint32_t kSettingsSaveDelayMs = 500;
 
 constexpr const char *kSettingsNamespace = "doorbell";
 
-constexpr uint32_t kFirmwareVersion = 0x00010002;
+constexpr uint32_t kFirmwareVersion = 0x00010003;
 constexpr uint16_t kOtaManufacturer = 0x1A1A;
 constexpr uint16_t kOtaImageType = 0x0001;
 constexpr uint16_t kOtaHardwareVersion = 0x0001;

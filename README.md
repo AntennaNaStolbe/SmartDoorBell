@@ -224,7 +224,7 @@ pio run -t uploadfs
 
 #### Выпуск обновления
 
-1. Увеличьте `kFirmwareVersion` в `include/config.h`, например с `0x00010001` до `0x00010002`.
+1. Увеличьте `kFirmwareVersion` в `include/config.h`, например с `0x00010002` до `0x00010003`.
 2. Соберите прошивку: `pio run`.
 3. Сгенерируйте OTA-файл и индекс с абсолютным URL GitHub:
 
@@ -238,15 +238,15 @@ python3 tools/make_ota.py \
 4. Создайте тег и релиз. Сначала загрузите образ, затем индекс:
 
 ```bash
-git tag v1.0.2
-git push origin v1.0.2
+git tag v1.0.3
+git push origin v1.0.3
 
-gh release create v1.0.2 \
+gh release create v1.0.3 \
   zigbee2mqtt/ota/DIY-SmartDoorBell.zigbee \
-  --title "v1.0.2" \
-  --notes "Zigbee OTA firmware 0x00010002"
+  --title "v1.0.3" \
+  --notes "Zigbee OTA firmware 0x00010003"
 
-gh release upload v1.0.2 zigbee2mqtt/ota/index.json
+gh release upload v1.0.3 zigbee2mqtt/ota/index.json
 ```
 
 5. В `configuration.yaml` Zigbee2MQTT укажите постоянный URL индекса:
@@ -318,7 +318,7 @@ python3 tools/make_ota.py
 | `kAudioRestartTimeoutMs` | 300 | Ожидание остановки аудио перед повтором |
 | `kSettingsSaveDelayMs` | 500 | Задержка сохранения настроек в NVS |
 | `kSettingsNamespace` | `doorbell` | Namespace NVS |
-| `kFirmwareVersion` | `0x00010002` | Версия прошивки для OTA |
+| `kFirmwareVersion` | `0x00010003` | Версия прошивки для OTA |
 | `kOtaManufacturer` | `0x1A1A` | Manufacturer code OTA |
 | `kOtaImageType` | `0x0001` | Image type OTA |
 | `kOtaHardwareVersion` | `0x0001` | Hardware version OTA |

@@ -1,12 +1,12 @@
 [
   {
     "fileName": "DIY-SmartDoorBell.zigbee",
-    "fileVersion": 65538,
+    "fileVersion": 65539,
     "fileSize": 886674,
     "url": "https://github.com/AntennaNaStolbe/SmartDoorBell/releases/latest/download/DIY-SmartDoorBell.zigbee",
     "imageType": 1,
     "manufacturerCode": 6682,
-    "sha512": "aca7d09e841406e0ad59b9072cba7c11b672a351e3c54c5dda2d8f1c0512f42748251d9bba148d4671ad040408e5ce46cc3a80c42a0c024959422f38b0b19349",
+    "sha512": "caf8f4b70469d34a0713f42d40b88eab6335135ba4838802fa531f43df34bbaee717c4cb747365fcdf5dae376a267bc173fd2d8da12e72e1961b2c898170c3a1",
     "otaHeaderString": "SmartDoorBell"
   }
 ]
