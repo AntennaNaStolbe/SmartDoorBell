@@ -145,7 +145,7 @@ bool begin(const LightSettings &initialSettings) {
     return false;
   }
 
-  endpoint->setManufacturerAndModel("DIY", "SmartDoorBell");
+  endpoint->setManufacturerAndModel(config::kManufacturerName, config::kModelName);
   endpoint->setPowerSource(ZB_POWER_SOURCE_MAINS);
   endpoint->addTimeCluster();
   endpoint->setLightColorCapabilities(ZIGBEE_COLOR_CAPABILITY_X_Y);

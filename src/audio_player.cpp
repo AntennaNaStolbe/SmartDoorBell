@@ -95,19 +95,6 @@ bool readWavInfo(File &file, WavInfo &info) {
   return false;
 }
 
-void writeSilence(uint32_t sampleRate) {
-  constexpr uint8_t kSilence[256] = {};
-  const uint32_t bytes = (sampleRate / 50U) * 4U;
-  uint32_t written = 0;
-  while (written < bytes) {
-    const size_t chunk = (bytes - written) < sizeof(kSilence) ? (bytes - written) : sizeof(kSilence);
-    if (i2s.write(kSilence, chunk) != chunk) {
-      break;
-    }
-    written += chunk;
-  }
-}
-
 void audioTask(void *) {
   File file = LittleFS.open(config::kDoorbellPath, "r");
   if (!file) {
@@ -152,7 +139,6 @@ void audioTask(void *) {
   uint8_t input[kSamplesPerChunk * 2];
   uint8_t output[kSamplesPerChunk * 4];
   uint32_t remaining = info.dataSize;
-  bool writeOk = true;
 
   while (remaining > 0 && !stopRequested.load()) {
     size_t request = remaining < sizeof(input) ? remaining : sizeof(input);
@@ -176,20 +162,13 @@ void audioTask(void *) {
         output[i * 4 + 3] = input[i * 2 + 1];
       }
       if (i2s.write(output, samples * 4) != samples * 4) {
-        writeOk = false;
         break;
       }
     } else {
       if (i2s.write(input, got) != got) {
-        writeOk = false;
         break;
       }
     }
-  }
-
-  if (writeOk && !stopRequested.load()) {
-    writeSilence(info.sampleRate);
-    delay(50);
   }
 
   i2s.end();

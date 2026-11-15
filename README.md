@@ -1,19 +1,19 @@
 # SmartDoorBell на ESP32-C6
 
-Умный дверной звонок: в простое адресная лента светится настраиваемым цветом, при касании сенсорной кнопки красная волна расходится от центра, а из динамика играет мелодия звонка. После отпускания кнопки текущий цикл доигрывается, затем лента возвращается к подсветке простоя.
+Умный дверной звонок: в простое адресная лента светится настраиваемым цветом, при касании сенсорной кнопки диоды последовательно загораются контрастным цветом, а из динамика играет мелодия звонка. После отпускания кнопки текущий цикл доигрывается, затем лента возвращается к подсветке простоя.
 
 ## Возможности
 
 - Подсветка простоя: включение, яркость и цвет задаются из Home Assistant через Zigbee.
 - Настройки подсветки сохраняются в NVS и переживают перезагрузку.
 - Сенсорная кнопка TTP223, антидребезг 40 мс.
-- Симметричная анимация от центра: пары диодов загораются красным за 5 шагов по 100 мс.
+- Последовательная анимация: 9 диодов загораются по одному каждые 130 мс; цвет контрастен подсветке простоя.
 - Удержание кнопки повторяет звонок; после отпускания текущий цикл доигрывается.
 - Мелодия дверного звонка через MAX98357A и динамик.
-- Анимация и звук работают параллельно и не блокируют друг друга.
+- Анимация и звук работают параллельно; мелодия играет в отдельной задаче FreeRTOS.
 - Мелодия хранится в LittleFS и легко заменяется без пересборки прошивки.
 - Zigbee-роутер для Zigbee2MQTT: light, кнопка «Звонок», событие касания и OTA.
-- Датчик `last_press` с датой и временем последнего нажатия или удалённого звонка.
+- Датчик `last_press` с временем последнего нажатия или удалённого звонка по данным Zigbee2MQTT.
 
 ## Аппаратура
 
@@ -89,17 +89,22 @@
 stateDiagram-v2
     [*] --> Idle
     Idle --> Fill: касание TTP223 или ring из HA
-    Fill --> Hold: все 9 диодов красные
-    Hold --> Fill: кнопка удерживается, мелодия закончилась
-    Hold --> Idle: кнопка отпущена, мелодия закончилась
+    Fill --> Hold: все 9 диодов горят, 1170 мс
+    Hold --> Off: 130 мс
+    Off --> On: 650 мс
+    On --> Fill: кнопка удерживается, 2600 мс
+    On --> Idle: кнопка отпущена, 2600 мс
 ```
 
 - В состоянии `Idle` все 9 диодов светятся цветом и яркостью из `light`-сущности.
 - По фронту касания запускаются анимация и аудио.
-- В состоянии `Fill` диоды загораются парами от центра к краям: 5 шагов по 100 мс.
-- В состоянии `Hold` все диоды красные, пока играет мелодия.
-- Если кнопка всё ещё удерживается после окончания мелодии, звонок и анимация повторяются.
-- После отпускания кнопки текущий цикл не обрывается, а доигрывает до конца.
+- В состоянии `Fill` диоды загораются по одному от первого к последнему: 9 шагов по 130 мс, всего 1170 мс.
+- В состоянии `Hold` все диоды горят цветом анимации 130 мс.
+- В состоянии `Off` лента выключена 650 мс.
+- В состоянии `On` все диоды горят цветом анимации 650 мс.
+- Полный цикл занимает 2600 мс и совпадает по длительности с `doorbell.wav`.
+- Если кнопка всё ещё удерживается в конце цикла, анимация и звук запускаются снова.
+- После отпускания кнопки текущий цикл не обрывается, а доигрывает до конца; затем лента возвращается в `Idle`.
 - Мелодия играет в отдельной задаче FreeRTOS, поэтому не задерживает анимацию.
 
 ## Аудио
@@ -112,7 +117,9 @@ stateDiagram-v2
 - PCM без сжатия;
 - 16 бит на сэмпл;
 - моно или стерео;
-- частота дискретизации 16 кГц (прошивка читает частоту из заголовка, но 16 кГц — оптимальный вариант).
+- частота дискретизации 16 кГц (прошивка читает частоту из заголовка, но 16 кГц — оптимальный вариант);
+- длительность 2.6 с, чтобы совпадать с циклом анимации;
+- короткий fade и 20–50 мс тишины в конце, чтобы не было щелчка: прошивка больше не добавляет тишину после файла.
 
 Мелодия генерируется скриптом `tools/make_doorbell.py`: классический двухнотный «дин-дон» с затуханием, без сторонних аудиофайлов и лицензионных ограничений.
 
@@ -148,7 +155,7 @@ pio run -t uploadfs
 
 ## Zigbee2MQTT и Home Assistant
 
-Устройство работает как Zigbee-роутер. Основной endpoint — color dimmable light (On/Off, Level, Color, Identify), также используются кластеры Time и OTA client. On/Off client отправляет физическое нажатие в координатор. Внешний конвертер добавляет кнопку, событие и датчик времени.
+Устройство работает как Zigbee-роутер. Производитель — `AntennaNS`, модель — `SmartDoorBell`. Основной endpoint — color dimmable light (On/Off, Level, Color, Identify), также используются кластеры Time и OTA client. On/Off client отправляет физическое нажатие в координатор. Внешний конвертер добавляет кнопку, событие и датчик времени.
 
 ### Сущности
 
@@ -156,7 +163,7 @@ pio run -t uploadfs
 |---|---|---|
 | `light` | light | Включение, яркость и цвет подсветки простоя |
 | `ring` | button | Запускает звонок через `genIdentify.identify` |
-| `last_press` | sensor, `device_class: timestamp` | Время последнего физического касания или удалённого звонка |
+| `last_press` | sensor, `device_class: timestamp` | Время приёма в Z2M последнего физического касания или удалённого звонка |
 | `action` | event | Событие `single` только при физическом касании |
 | `update` | update | OTA-обновление прошивки через Zigbee2MQTT |
 
@@ -181,28 +188,72 @@ pio run -t uploadfs
 
 ### Установка конвертера
 
-1. В `configuration.yaml` Zigbee2MQTT включите event-сущности:
+1. В `configuration.yaml` Zigbee2MQTT включите внешние JS-конвертеры и event-сущности:
 
 ```yaml
+advanced:
+  enable_external_js: true
+
 homeassistant:
   experimental_event_entities: true
 ```
 
-`enable_external_js` по умолчанию равен `true`; если он был отключён, включите его. Файлы из папки `external_converters` загружаются автоматически.
+Если блоки `advanced:` или `homeassistant:` уже существуют, добавьте ключи внутрь них. Не создавайте второй такой же блок: Z2M выдаст предупреждение о дублирующемся ключе.
 
-2. Скопируйте `zigbee2mqtt/smart-doorbell.mjs` в папку `external_converters` рядом с `configuration.yaml` Zigbee2MQTT.
+2. Скопируйте `zigbee2mqtt/smart-doorbell.mjs` в папку `external_converters` каталога данных Z2M:
 
-3. Перезапустите Zigbee2MQTT и проверьте в логе строку `Loaded external converter 'smart-doorbell.mjs'`.
+- HAOS add-on: `/addon_configs/45df7312_zigbee2mqtt/external_converters/smart-doorbell.mjs`;
+- standalone/Docker: `<data_dir>/external_converters/smart-doorbell.mjs`, где `<data_dir>` содержит `configuration.yaml`.
+
+Папку `external_converters` создайте, если её нет. Не копируйте конвертер в папку `zigbee2mqtt` репозитория: Z2M читает файлы только из своего каталога данных.
+
+3. Перезапустите add-on Zigbee2MQTT и проверьте в логе строку `Loaded external converter 'smart-doorbell.mjs'`. Если строки нет, проверьте путь, расширение `.mjs`, `advanced.enable_external_js` и права на файл.
 
 4. Включите `Permit join` и подайте питание на звонок. Устройство подключится как роутер.
 
 5. После сопряжения нажмите на TTP223. В MQTT появятся `action` и `last_press`; в Home Assistant — `light`, `button`, `event`, `sensor` и `update`.
 
+6. После OTA или смены производителя откройте устройство в Z2M и нажмите `Re-interview`. Проверьте `manufacturerName = AntennaNS`, `vendor = AntennaNS`, версию прошивки `0x00010004` и `update = off`.
+
+### Настройка OTA в Zigbee2MQTT
+
+В `configuration.yaml` добавьте постоянный URL индекса OTA:
+
+```yaml
+ota:
+  zigbee_ota_override_index_location: https://github.com/AntennaNaStolbe/SmartDoorBell/releases/latest/download/index.json
+```
+
+Если блок `ota:` уже есть, добавьте ключ внутрь него. URL должен быть публично доступен из контейнера Z2M. Если вы используете форк, замените `AntennaNaStolbe` на свой GitHub-аккаунт и передайте свой `--base-url` при сборке OTA.
+
+После изменения конфигурации перезапустите Z2M. Затем откройте устройство → OTA → `Check for updates`. В Home Assistant должна появиться сущность `update`.
+
+Для появления OTA должны выполняться условия:
+
+- во внешнем конвертере указано `ota: true`;
+- `fileVersion` в `index.json` больше установленной версии;
+- `manufacturerCode = 0x1A1A`, `imageType = 0x0001` и hardware version `0x0001` совпадают с прошивкой;
+- релиз опубликован, а не сохранён как draft/prerelease;
+- в релизе есть и `index.json`, и `AntennaNS-SmartDoorBell.zigbee`.
+
+### Чек-лист нового пользователя
+
+- [ ] MQTT и координатор настроены.
+- [ ] В `configuration.yaml` включён `advanced.enable_external_js`.
+- [ ] `smart-doorbell.mjs` лежит в `external_converters`.
+- [ ] В логе есть `Loaded external converter 'smart-doorbell.mjs'`.
+- [ ] Включён `homeassistant.experimental_event_entities`.
+- [ ] Указан `ota.zigbee_ota_override_index_location`.
+- [ ] Z2M перезапущен.
+- [ ] Устройство сопряжено и при необходимости переинтервьюировано.
+- [ ] Появились `light`, `button`, `event`, `sensor.last_press` и `update`.
+- [ ] OTA находит версию `0x00010004`.
+
 ### Время
 
-Прошивка запрашивает время у координатора через кластер `genTime` при старте и повторно раз в 6 часов. Синхронизация выполняется в отдельной задаче и не блокирует звонок и анимацию. В прошивке учтён баг библиотеки Zigbee 3.3.8: `getTime()` возвращает секунды эпохи Zigbee (с 2000 года) как Unix-время, поэтому к результату добавляется поправка 946684800 секунд.
+`last_press` формируется в Zigbee2MQTT по времени приёма `commandOn` (физическое нажатие) или `ring` (удалённый звонок). Синхронизация времени устройства на него не влияет.
 
-Устройство отправляет `last_press` после успешной синхронизации времени. Удалённый звонок также обновляет `last_press`.
+Прошивка по-прежнему запрашивает время у координатора через кластер `genTime` при старте и повторно раз в 6 часов. Это отдельный механизм для времени устройства; он не блокирует звонок и анимацию. В прошивке учтён баг библиотеки Zigbee 3.3.8: `getTime()` возвращает секунды эпохи Zigbee (с 2000 года) как Unix-время, поэтому к результату добавляется поправка 946684800 секунд.
 
 ### OTA-обновление
 
@@ -224,7 +275,7 @@ pio run -t uploadfs
 
 #### Выпуск обновления
 
-1. Увеличьте `kFirmwareVersion` в `include/config.h`, например с `0x00010002` до `0x00010003`.
+1. Увеличьте `kFirmwareVersion` в `include/config.h`, например с `0x00010003` до `0x00010004`.
 2. Соберите прошивку: `pio run`.
 3. Сгенерируйте OTA-файл и индекс с абсолютным URL GitHub:
 
@@ -233,23 +284,23 @@ python3 tools/make_ota.py \
   --base-url https://github.com/AntennaNaStolbe/SmartDoorBell/releases/latest/download
 ```
 
-`make_ota.py` читает `kFirmwareVersion`, `kOtaManufacturer`, `kOtaImageType` и `kOtaHardwareVersion` из `include/config.h`.
+`make_ota.py` читает `kFirmwareVersion`, `kOtaManufacturer`, `kOtaImageType` и `kOtaHardwareVersion` из `include/config.h`. По умолчанию создаётся файл `zigbee2mqtt/ota/AntennaNS-SmartDoorBell.zigbee`.
 
 4. Создайте тег и релиз. Сначала загрузите образ, затем индекс:
 
 ```bash
-git tag v1.0.3
-git push origin v1.0.3
+git tag v1.0.4
+git push origin v1.0.4
 
-gh release create v1.0.3 \
-  zigbee2mqtt/ota/DIY-SmartDoorBell.zigbee \
-  --title "v1.0.3" \
-  --notes "Zigbee OTA firmware 0x00010003"
+gh release create v1.0.4 \
+  zigbee2mqtt/ota/AntennaNS-SmartDoorBell.zigbee \
+  --title "v1.0.4" \
+  --notes "Zigbee OTA firmware 0x00010004, manufacturer AntennaNS"
 
-gh release upload v1.0.3 zigbee2mqtt/ota/index.json
+gh release upload v1.0.4 zigbee2mqtt/ota/index.json
 ```
 
-5. В `configuration.yaml` Zigbee2MQTT укажите постоянный URL индекса:
+5. Если OTA-индекс ещё не настроен, добавьте в `configuration.yaml` Zigbee2MQTT:
 
 ```yaml
 ota:
@@ -258,7 +309,9 @@ ota:
 
 6. Перезапустите Z2M, откройте устройство → OTA → `Check for updates`. В Home Assistant у устройства появится сущность `update`.
 
-Важно: `fileVersion` должен быть больше версии, сейчас запущенной на устройстве. `manufacturerCode` (`0x1A1A`), `imageType` (`0x0001`) и hardware version (`0x0001`) должны совпадать с прошивкой.
+7. После установки OTA откройте устройство → `Re-interview`, чтобы Z2M обновил `manufacturerName` на `AntennaNS`.
+
+Важно: `fileVersion` должен быть больше версии, сейчас запущенной на устройстве. `manufacturerCode` (`0x1A1A`), `imageType` (`0x0001`) и hardware version (`0x0001`) должны совпадать с прошивкой. Релиз должен быть опубликован, а не сохранён как draft/prerelease, иначе `latest/download/index.json` может указывать на старую версию.
 
 Файл OTA собирается в формате ZCL: 56-байтный обязательный заголовок + 4 байта hardware versions, 6-байтный заголовок элемента и сама прошивка. `index.json` содержит SHA-512 и размер файла. Локальный вариант с `zigbee_ota_override_index_location: ota/index.json` остаётся доступен, если файлы из `zigbee2mqtt/ota` скопированы в каталог данных Z2M.
 
@@ -314,11 +367,18 @@ python3 tools/make_ota.py
 | `kZigbeeEndpoint` | 1 | Endpoint Zigbee |
 | `kTimeSyncRetryMs` | 10000 | Повтор синхронизации времени при ошибке |
 | `kTimeResyncMs` | 6 часов | Период повторной синхронизации |
-| `kFillStepMs` | 100 | Шаг анимации |
+| `kFillStepMs` | 130 | Шаг заполнения: один LED |
+| `kFillMs` | 1170 | Длительность заполнения |
+| `kHoldMs` | 130 | Удержание цвета анимации |
+| `kOffMs` | 650 | Пауза с выключенной лентой |
+| `kOnMs` | 650 | Финальная вспышка |
+| `kCycleMs` | 2600 | Полный цикл анимации и звука |
 | `kAudioRestartTimeoutMs` | 300 | Ожидание остановки аудио перед повтором |
 | `kSettingsSaveDelayMs` | 500 | Задержка сохранения настроек в NVS |
 | `kSettingsNamespace` | `doorbell` | Namespace NVS |
-| `kFirmwareVersion` | `0x00010003` | Версия прошивки для OTA |
+| `kManufacturerName` | `AntennaNS` | Имя производителя в Zigbee |
+| `kModelName` | `SmartDoorBell` | Имя модели в Zigbee |
+| `kFirmwareVersion` | `0x00010004` | Версия прошивки для OTA |
 | `kOtaManufacturer` | `0x1A1A` | Manufacturer code OTA |
 | `kOtaImageType` | `0x0001` | Image type OTA |
 | `kOtaHardwareVersion` | `0x0001` | Hardware version OTA |
@@ -347,12 +407,15 @@ python3 tools/make_ota.py
 | Ложные касания | Питание TTP223 3.3 В, общий GND, калибровка после включения, расстояние до металла |
 | Плата перезагружается при звуке | Слишком слабый блок питания, используйте 5 В 3 А |
 | Не появляется в Zigbee2MQTT | `Permit join`, установленный конвертер, `enable_external_js: true`, сброс Zigbee кнопкой BOOT |
-| Нет `last_press` | Проверьте загрузку конвертера и синхронизацию времени Zigbee |
+| Конвертер не загрузился | Путь `external_converters/smart-doorbell.mjs`, расширение `.mjs`, `advanced.enable_external_js: true`, перезапуск add-on Z2M, строка `Loaded external converter` в логе |
+| Нет `last_press` | Проверьте загрузку конвертера и события `commandOn`/`ring` в MQTT; синхронизация времени Zigbee для `last_press` не нужна |
 | Кнопка `ring` не работает | Конвертер загружен, модель `SmartDoorBell`, MQTT-топик `/set`, статус сопряжения |
 | Нет сущности `action` | Включите `homeassistant.experimental_event_entities: true` и перезапустите Z2M |
-| Нет сущности `update` | Проверьте `ota.zigbee_ota_override_index_location`, доступность `index.json`, совпадение manufacturer/image type и версию выше текущей |
+| Нет сущности `update` | Проверьте `ota.zigbee_ota_override_index_location`, публичную доступность `index.json`, `ota: true` в конвертере, совпадение manufacturer/image type/hardware version и версию выше текущей |
+| OTA 404 или не видит файл | Проверьте имя `AntennaNS-SmartDoorBell.zigbee` в `index.json` и в релизе; релиз должен быть опубликован и содержать оба файла |
 | OTA не начинается | Увеличьте `kFirmwareVersion`, пересоберите образ и `index.json`; проверьте лог `Zigbee - OTA` в Serial Monitor |
 | OTA обрывается | Проверьте питание, размер образа не больше `0x140000`, стабильность Zigbee-сети |
+| После OTA остался `DIY` | Сделайте `Re-interview` устройства в Z2M, чтобы обновить `manufacturerName` на `AntennaNS` |
 | `buildfs` падает с `LFS_ERR_NOSPC` | Используется `partitions_zigbee_zczr.csv`, а не стандартный `zigbee_zczr.csv` |
 
 ## Структура проекта
@@ -387,7 +450,7 @@ SmartDoorBell/
 ├── zigbee2mqtt/
 │   ├── smart-doorbell.mjs
 │   └── ota/
-│       ├── DIY-SmartDoorBell.zigbee
+│       ├── AntennaNS-SmartDoorBell.zigbee
 │       └── index.json
 ├── partitions_zigbee_zczr.csv
 ├── platformio.ini
@@ -399,6 +462,7 @@ SmartDoorBell/
 
 - Мелодия синтезируется локально, сторонние аудиофайлы не используются.
 - Прошивка использует Adafruit NeoPixel, встроенные ESP_I2S и Zigbee.
-- Анимация и звук неблокирующие: лента продолжает работать, пока играет звонок.
+- Анимация и звук синхронизированы по циклу 2600 мс; мелодия играет в отдельной задаче FreeRTOS.
 - Zigbee-стек работает как роутер; для прошивки нужен раздел `zigbee_zczr` и флаги `ZIGBEE_MODE_ZCZR`.
 - Внешний конвертер Z2M использует стандартные кластеры, без кастомных cluster-команд.
+- Zigbee-производитель — `AntennaNS`; после смены производителя требуется `Re-interview` в Z2M.

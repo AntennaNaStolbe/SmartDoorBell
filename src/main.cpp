@@ -13,16 +13,13 @@ Adafruit_NeoPixel strip(config::kLedCount, config::kLedPin, NEO_GRB + NEO_KHZ800
 const uint32_t kRed = strip.Color(255, 0, 0);
 const uint32_t kBlack = strip.Color(0, 0, 0);
 
-constexpr uint8_t kCenterOutOrder[config::kLedCount] = {4, 3, 5, 2, 6, 1, 7, 0, 8};
-
-enum class AnimState : uint8_t { Idle, Fill, Hold };
+enum class AnimState : uint8_t { Idle, Fill, Hold, Off, On };
 enum class RingSource : uint8_t { Touch, Zigbee, Repeat };
 
 AnimState animState = AnimState::Idle;
 uint8_t litCount = 0;
-uint32_t lastStepMs = 0;
-bool cycleActive = false;
-bool cycleAudioOk = false;
+uint32_t phaseStartMs = 0;
+uint32_t animationColor = kRed;
 
 int lastTouchReading = LOW;
 int stableTouchReading = LOW;
@@ -61,6 +58,73 @@ void applyIdle() {
 
   strip.setBrightness(scaleLevel(idleSettings.level));
   fillAll(strip.Color(idleSettings.red, idleSettings.green, idleSettings.blue));
+}
+
+uint32_t contrastColor() {
+  if (!idleSettings.on || idleSettings.level == 0) {
+    return kRed;
+  }
+
+  const uint8_t red = idleSettings.red;
+  const uint8_t green = idleSettings.green;
+  const uint8_t blue = idleSettings.blue;
+  const uint8_t max = red > green ? (red > blue ? red : blue)
+                                  : (green > blue ? green : blue);
+  const uint8_t min = red < green ? (red < blue ? red : blue)
+                                  : (green < blue ? green : blue);
+  const uint8_t delta = max - min;
+
+  if (max == 0 || static_cast<uint16_t>(delta) * 5U < max) {
+    return kRed;
+  }
+
+  int hue = 0;
+  if (max == red) {
+    hue = 60 * (static_cast<int>(green) - blue) / delta;
+    if (hue < 0) {
+      hue += 360;
+    }
+  } else if (max == green) {
+    hue = 60 * (static_cast<int>(blue) - red) / delta + 120;
+  } else {
+    hue = 60 * (static_cast<int>(red) - green) / delta + 240;
+  }
+
+  hue = (hue + 180) % 360;
+  const uint8_t sector = hue / 60;
+  const uint8_t fraction = (hue % 60) * 255 / 60;
+  uint8_t r = 0;
+  uint8_t g = 0;
+  uint8_t b = 0;
+
+  switch (sector) {
+    case 0:
+      r = 255;
+      g = fraction;
+      break;
+    case 1:
+      r = 255 - fraction;
+      g = 255;
+      break;
+    case 2:
+      g = 255;
+      b = fraction;
+      break;
+    case 3:
+      g = 255 - fraction;
+      b = 255;
+      break;
+    case 4:
+      r = fraction;
+      b = 255;
+      break;
+    default:
+      r = 255;
+      b = 255 - fraction;
+      break;
+  }
+
+  return strip.Color(r, g, b);
 }
 
 void loadSettings() {
@@ -120,17 +184,13 @@ void saveSettingsIfNeeded(uint32_t now) {
   settingsDirty = false;
 }
 
-void startCycle(uint32_t now, RingSource source) {
+void startCycle(RingSource source) {
   Serial.println(source == RingSource::Touch ? "Touch: starting doorbell"
                                              : (source == RingSource::Zigbee
                                                     ? "Zigbee: starting doorbell"
                                                     : "Doorbell: repeating cycle"));
 
-  animState = AnimState::Fill;
-  litCount = 0;
-  cycleActive = true;
-  lastStepMs = now - config::kFillStepMs;
-
+  animationColor = contrastColor();
   strip.setBrightness(config::kMaxBrightness);
   if (idleSettings.on && idleSettings.level > 0) {
     fillAll(strip.Color(idleSettings.red, idleSettings.green, idleSettings.blue));
@@ -138,16 +198,17 @@ void startCycle(uint32_t now, RingSource source) {
     fillAll(kBlack);
   }
 
-  cycleAudioOk = audio::playDoorbell(true);
-  if (!cycleAudioOk) {
+  if (source == RingSource::Touch) {
+    doorbell_zigbee::notifyPress(doorbell_zigbee::unixNow());
+  }
+
+  if (!audio::playDoorbell(true)) {
     Serial.println("Doorbell: audio unavailable");
   }
 
-  if (source == RingSource::Touch) {
-    doorbell_zigbee::notifyPress(doorbell_zigbee::unixNow());
-  } else if (source == RingSource::Zigbee) {
-    doorbell_zigbee::reportPressTime(doorbell_zigbee::unixNow());
-  }
+  animState = AnimState::Fill;
+  litCount = 0;
+  phaseStartMs = millis();
 }
 
 bool takeLightChange(uint32_t now) {
@@ -197,7 +258,7 @@ void checkTouch(uint32_t now) {
   stableTouchReading = reading;
   if (stableTouchReading == config::kTouchActiveLevel) {
     touchHeld = true;
-    startCycle(now, RingSource::Touch);
+    startCycle(RingSource::Touch);
   } else {
     touchHeld = false;
   }
@@ -205,31 +266,51 @@ void checkTouch(uint32_t now) {
 
 void updateAnimation(uint32_t now) {
   switch (animState) {
-    case AnimState::Fill:
-      if (now - lastStepMs >= config::kFillStepMs) {
-        lastStepMs = now;
-        const uint8_t count = (litCount == 0) ? 1 : 2;
-        for (uint8_t i = 0; i < count && litCount < config::kLedCount; ++i) {
-          strip.setPixelColor(kCenterOutOrder[litCount], kRed);
+    case AnimState::Fill: {
+      const uint32_t elapsed = now - phaseStartMs;
+      uint32_t target = elapsed / config::kFillStepMs + 1;
+      if (target > config::kLedCount) {
+        target = config::kLedCount;
+      }
+      if (target != litCount) {
+        while (litCount < target) {
+          strip.setPixelColor(litCount, animationColor);
           ++litCount;
         }
         strip.show();
-        if (litCount >= config::kLedCount) {
-          animState = AnimState::Hold;
-        }
+      }
+      if (elapsed >= config::kFillMs) {
+        animState = AnimState::Hold;
+        phaseStartMs = now;
+      }
+      break;
+    }
+
+    case AnimState::Hold:
+      if (now - phaseStartMs >= config::kHoldMs) {
+        fillAll(kBlack);
+        animState = AnimState::Off;
+        phaseStartMs = now;
       }
       break;
 
-    case AnimState::Hold:
-      if (!cycleActive || audio::isBusy()) {
-        break;
+    case AnimState::Off:
+      if (now - phaseStartMs >= config::kOffMs) {
+        fillAll(animationColor);
+        animState = AnimState::On;
+        phaseStartMs = now;
       }
-      if (touchHeld && cycleAudioOk) {
-        startCycle(now, RingSource::Repeat);
-      } else {
-        cycleActive = false;
-        animState = AnimState::Idle;
-        applyIdle();
+      break;
+
+    case AnimState::On:
+      if (now - phaseStartMs >= config::kOnMs) {
+        if (touchHeld) {
+          startCycle(RingSource::Repeat);
+        } else {
+          animState = AnimState::Idle;
+          audio::stop();
+          applyIdle();
+        }
       }
       break;
 
@@ -266,7 +347,7 @@ void loop() {
   const uint32_t now = millis();
 
   if (doorbell_zigbee::takeRingRequest()) {
-    startCycle(now, RingSource::Zigbee);
+    startCycle(RingSource::Zigbee);
   }
 
   checkFactoryReset(now);

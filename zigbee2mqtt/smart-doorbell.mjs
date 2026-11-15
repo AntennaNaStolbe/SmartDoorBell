@@ -3,12 +3,11 @@ import {fromZigbee as fz, toZigbee as tz} from 'zigbee-herdsman-converters';
 
 const e = exposes.presets;
 const ea = exposes.access;
-const zigbeeEpochOffset = 946684800;
 
 export default {
   zigbeeModel: ['SmartDoorBell'],
   model: 'SmartDoorBell',
-  vendor: 'DIY',
+  vendor: 'AntennaNS',
   description: 'ESP32-C6 smart doorbell with touch button, LED ring and Zigbee router',
   fromZigbee: [
     fz.on_off,
@@ -17,18 +16,7 @@ export default {
     {
       cluster: 'genOnOff',
       type: 'commandOn',
-      convert: () => ({action: 'single'}),
-    },
-    {
-      cluster: 'genTime',
-      type: 'attributeReport',
-      convert: (model, msg) => {
-        if (msg.data.time === undefined) {
-          return;
-        }
-        const unix = msg.data.time + zigbeeEpochOffset;
-        return {last_press: new Date(unix * 1000).toISOString()};
-      },
+      convert: () => ({action: 'single', last_press: new Date().toISOString()}),
     },
   ],
   toZigbee: [
@@ -38,7 +26,7 @@ export default {
       key: ['ring'],
       convertSet: async (entity, key, value, meta) => {
         await entity.command('genIdentify', 'identify', {identifytime: 1}, {disableDefaultResponse: true});
-        return {state: {[key]: value}};
+        return {state: {[key]: value, last_press: new Date().toISOString()}};
       },
     },
   ],

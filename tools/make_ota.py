@@ -22,7 +22,7 @@ OTA_IMAGE_ELEMENT_HEADER_SIZE = 6
 
 ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_FIRMWARE = ROOT / ".pio" / "build" / "esp32-c6-supermini" / "firmware.bin"
-DEFAULT_OUTPUT = ROOT / "zigbee2mqtt" / "ota" / "DIY-SmartDoorBell.zigbee"
+DEFAULT_OUTPUT = ROOT / "zigbee2mqtt" / "ota" / "AntennaNS-SmartDoorBell.zigbee"
 DEFAULT_INDEX = ROOT / "zigbee2mqtt" / "ota" / "index.json"
 DEFAULT_CONFIG = ROOT / "include" / "config.h"
 CONFIG_CONSTANTS = (

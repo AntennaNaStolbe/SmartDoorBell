@@ -24,13 +24,20 @@ constexpr uint32_t kTimeSyncRetryMs = 10000;
 constexpr uint32_t kTimeResyncMs = 6UL * 60UL * 60UL * 1000UL;
 constexpr uint32_t kOtaQueryIntervalMs = 6UL * 60UL * 60UL * 1000UL;
 
-constexpr uint32_t kFillStepMs = 100;
+constexpr uint32_t kFillStepMs = 130;
+constexpr uint32_t kFillMs = kLedCount * kFillStepMs;
+constexpr uint32_t kHoldMs = 130;
+constexpr uint32_t kOffMs = 650;
+constexpr uint32_t kOnMs = 650;
+constexpr uint32_t kCycleMs = kFillMs + kHoldMs + kOffMs + kOnMs;
 constexpr uint32_t kAudioRestartTimeoutMs = 300;
 constexpr uint32_t kSettingsSaveDelayMs = 500;
 
 constexpr const char *kSettingsNamespace = "doorbell";
+constexpr const char *kManufacturerName = "AntennaNS";
+constexpr const char *kModelName = "SmartDoorBell";
 
-constexpr uint32_t kFirmwareVersion = 0x00010003;
+constexpr uint32_t kFirmwareVersion = 0x00010004;
 constexpr uint16_t kOtaManufacturer = 0x1A1A;
 constexpr uint16_t kOtaImageType = 0x0001;
 constexpr uint16_t kOtaHardwareVersion = 0x0001;
