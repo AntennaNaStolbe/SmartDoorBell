@@ -2,4 +2,6 @@
 .vscode/
 .DS_Store
 compile_commands.json
+__pycache__/
+*.pyc
 zigbee2mqtt/ota/*.zigbee

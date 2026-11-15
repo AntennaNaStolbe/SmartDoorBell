@@ -315,6 +315,54 @@ ota:
 
 Файл OTA собирается в формате ZCL: 56-байтный обязательный заголовок + 4 байта hardware versions, 6-байтный заголовок элемента и сама прошивка. `index.json` содержит SHA-512 и размер файла. Локальный вариант с `zigbee_ota_override_index_location: ota/index.json` остаётся доступен, если файлы из `zigbee2mqtt/ota` скопированы в каталог данных Z2M.
 
+#### Быстрая OTA
+
+По умолчанию Z2M передаёт OTA блоками по 50 байт с паузой 250 мс. Для образа ~887 КБ это ~74 минуты только на передачу; на практике обновление занимает около 77 минут.
+
+Для одной OTA можно передать параметры прямо в запросе, не меняя глобальный конфиг Z2M. Скрипт `tools/fast_ota.py` использует 64 байта и 50 мс — примерно 12 минут теоретически и 15–20 минут с учётом накладных расходов:
+
+```bash
+export HA_URL="https://ha.example.com"
+export HA_TOKEN="..."
+
+python3 tools/fast_ota.py --version v1.0.5 --yes
+```
+
+Проверить запрос без запуска:
+
+```bash
+python3 tools/fast_ota.py --version v1.0.5 --dry-run
+```
+
+Если URL образа нестандартный, передайте его через `--firmware-url`.
+
+Эквивалентный MQTT-запрос:
+
+```json
+{
+  "id": "0x9888e0fffe71bca8",
+  "url": "https://github.com/AntennaNaStolbe/SmartDoorBell/releases/download/v1.0.5/AntennaNS-SmartDoorBell.zigbee",
+  "default_maximum_data_size": 64,
+  "image_block_response_delay": 50
+}
+```
+
+Топик: `zigbee2mqtt/bridge/request/device/ota_update/update`.
+
+Не используйте для быстрой OTA кнопку `update.install` в Home Assistant: она отправляет только `id` и не передаёт параметры чанков. Запускайте обновление скриптом или напрямую через MQTT.
+
+`64/50` — компромисс между скоростью и стабильностью. `100/50` быстрее (~7–8 минут теоретически), но выше риск повторов и сбоев. Если OTA проходит нестабильно, повторите с `50/100` или верните дефолтные `50/250`. Не прерывайте питание во время прошивки и обновляйте только одно устройство за раз.
+
+Если нужно ускорить все будущие OTA, можно задать глобально в `configuration.yaml`:
+
+```yaml
+ota:
+  default_maximum_data_size: 64
+  image_block_response_delay: 50
+```
+
+После изменения глобальных настроек перезапустите Z2M. Для разового обновления предпочтительнее параметры в запросе: они не влияют на другие устройства.
+
 ### Сброс Zigbee
 
 Удерживайте кнопку BOOT (GPIO9) на плате 5 секунд во время работы устройства. Прошивка выполнит сброс Zigbee-настроек и перезагрузится. Не удерживайте BOOT при включении питания: ESP32-C6 войдёт в режим загрузчика.
@@ -414,6 +462,7 @@ python3 tools/make_ota.py
 | Нет сущности `update` | Проверьте `ota.zigbee_ota_override_index_location`, публичную доступность `index.json`, `ota: true` в конвертере, совпадение manufacturer/image type/hardware version и версию выше текущей |
 | OTA 404 или не видит файл | Проверьте имя `AntennaNS-SmartDoorBell.zigbee` в `index.json` и в релизе; релиз должен быть опубликован и содержать оба файла |
 | OTA не начинается | Увеличьте `kFirmwareVersion`, пересоберите образ и `index.json`; проверьте лог `Zigbee - OTA` в Serial Monitor |
+| OTA идёт около часа | Это дефолтные 50 B / 250 мс; используйте `tools/fast_ota.py` с 64/50 |
 | OTA обрывается | Проверьте питание, размер образа не больше `0x140000`, стабильность Zigbee-сети |
 | После OTA остался `DIY` | Сделайте `Re-interview` устройства в Z2M, чтобы обновить `manufacturerName` на `AntennaNS` |
 | `buildfs` падает с `LFS_ERR_NOSPC` | Используется `partitions_zigbee_zczr.csv`, а не стандартный `zigbee_zczr.csv` |
@@ -445,6 +494,7 @@ SmartDoorBell/
 │   ├── mainBox.png
 │   └── button.png
 ├── tools/
+│   ├── fast_ota.py
 │   ├── make_doorbell.py
 │   └── make_ota.py
 ├── zigbee2mqtt/
