@@ -1,12 +1,12 @@
 [
   {
     "fileName": "AntennaNS-SmartDoorBell.zigbee",
-    "fileVersion": 65540,
-    "fileSize": 886866,
+    "fileVersion": 65541,
+    "fileSize": 886834,
     "url": "https://github.com/AntennaNaStolbe/SmartDoorBell/releases/latest/download/AntennaNS-SmartDoorBell.zigbee",
     "imageType": 1,
     "manufacturerCode": 6682,
-    "sha512": "5d3b0e930eea2f963efc0c21a2958474ae2dac8a726755621dd1b625f183ed928da5cc85d432884e1693fe6afac0b77489467d6d306511d5bf58da4eb5900180",
+    "sha512": "260336b7a1505a66a0d8b0f14e5285a4407933dbaa66bebe71b916e9a424ad685aa17d213bfb5a103a76b9c06f91a8e9cb0089e7f3bae1fdecabf56b20062be3",
     "otaHeaderString": "SmartDoorBell"
   }
 ]

@@ -267,7 +267,7 @@ void checkTouch(uint32_t now) {
 void updateAnimation(uint32_t now) {
   switch (animState) {
     case AnimState::Fill: {
-      const uint32_t elapsed = now - phaseStartMs;
+      const uint32_t elapsed = now >= phaseStartMs ? now - phaseStartMs : 0;
       uint32_t target = elapsed / config::kFillStepMs + 1;
       if (target > config::kLedCount) {
         target = config::kLedCount;
@@ -308,7 +308,6 @@ void updateAnimation(uint32_t now) {
           startCycle(RingSource::Repeat);
         } else {
           animState = AnimState::Idle;
-          audio::stop();
           applyIdle();
         }
       }
@@ -354,7 +353,7 @@ void loop() {
   checkTouch(now);
   takeLightChange(now);
   saveSettingsIfNeeded(now);
-  updateAnimation(now);
+  updateAnimation(millis());
 
   delay(1);
 }

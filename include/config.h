@@ -37,7 +37,7 @@ constexpr const char *kSettingsNamespace = "doorbell";
 constexpr const char *kManufacturerName = "AntennaNS";
 constexpr const char *kModelName = "SmartDoorBell";
 
-constexpr uint32_t kFirmwareVersion = 0x00010004;
+constexpr uint32_t kFirmwareVersion = 0x00010005;
 constexpr uint16_t kOtaManufacturer = 0x1A1A;
 constexpr uint16_t kOtaImageType = 0x0001;
 constexpr uint16_t kOtaHardwareVersion = 0x0001;

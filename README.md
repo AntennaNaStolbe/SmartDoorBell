@@ -213,7 +213,7 @@ homeassistant:
 
 5. После сопряжения нажмите на TTP223. В MQTT появятся `action` и `last_press`; в Home Assistant — `light`, `button`, `event`, `sensor` и `update`.
 
-6. После OTA или смены производителя откройте устройство в Z2M и нажмите `Re-interview`. Проверьте `manufacturerName = AntennaNS`, `vendor = AntennaNS`, версию прошивки `0x00010004` и `update = off`.
+6. После OTA или смены производителя откройте устройство в Z2M и нажмите `Re-interview`. Проверьте `manufacturerName = AntennaNS`, `vendor = AntennaNS`, версию прошивки `0x00010005` и `update = off`.
 
 ### Настройка OTA в Zigbee2MQTT
 
@@ -247,7 +247,7 @@ ota:
 - [ ] Z2M перезапущен.
 - [ ] Устройство сопряжено и при необходимости переинтервьюировано.
 - [ ] Появились `light`, `button`, `event`, `sensor.last_press` и `update`.
-- [ ] OTA находит версию `0x00010004`.
+- [ ] OTA находит версию `0x00010005`.
 
 ### Время
 
@@ -275,7 +275,7 @@ pio run -t uploadfs
 
 #### Выпуск обновления
 
-1. Увеличьте `kFirmwareVersion` в `include/config.h`, например с `0x00010003` до `0x00010004`.
+1. Увеличьте `kFirmwareVersion` в `include/config.h`, например с `0x00010003` до `0x00010005`.
 2. Соберите прошивку: `pio run`.
 3. Сгенерируйте OTA-файл и индекс с абсолютным URL GitHub:
 
@@ -289,15 +289,15 @@ python3 tools/make_ota.py \
 4. Создайте тег и релиз. Сначала загрузите образ, затем индекс:
 
 ```bash
-git tag v1.0.4
-git push origin v1.0.4
+git tag v1.0.5
+git push origin v1.0.5
 
-gh release create v1.0.4 \
+gh release create v1.0.5 \
   zigbee2mqtt/ota/AntennaNS-SmartDoorBell.zigbee \
-  --title "v1.0.4" \
-  --notes "Zigbee OTA firmware 0x00010004, manufacturer AntennaNS"
+  --title "v1.0.5" \
+  --notes "Zigbee OTA firmware 0x00010005, manufacturer AntennaNS"
 
-gh release upload v1.0.4 zigbee2mqtt/ota/index.json
+gh release upload v1.0.5 zigbee2mqtt/ota/index.json
 ```
 
 5. Если OTA-индекс ещё не настроен, добавьте в `configuration.yaml` Zigbee2MQTT:
@@ -426,7 +426,7 @@ python3 tools/make_ota.py
 | `kSettingsNamespace` | `doorbell` | Namespace NVS |
 | `kManufacturerName` | `AntennaNS` | Имя производителя в Zigbee |
 | `kModelName` | `SmartDoorBell` | Имя модели в Zigbee |
-| `kFirmwareVersion` | `0x00010004` | Версия прошивки для OTA |
+| `kFirmwareVersion` | `0x00010005` | Версия прошивки для OTA |
 | `kOtaManufacturer` | `0x1A1A` | Manufacturer code OTA |
 | `kOtaImageType` | `0x0001` | Image type OTA |
 | `kOtaHardwareVersion` | `0x0001` | Hardware version OTA |
